@@ -1,0 +1,32 @@
+name: Deploy to Server
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Login to Docker Hub
+      run: docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASS }}
+
+    - name: Build and Push Image
+      run: |
+        docker build -t myapp:${{ github.sha }} .
+        docker push myapp:${{ github.sha }}
+
+    - name: Deploy to Server
+      uses: appleboy/ssh-action@v1
+      with:
+        host: ${{ secrets.SERVER_IP }}
+        username: ubuntu
+        key: ${{ secrets.SSH_KEY }}
+        script: |
+          docker pull myapp:${{ github.sha }}
+          docker stop myapp || true
+          docker rm myapp || true
+          docker run -d -p 80:5000 --name myapp myapp:${{ github.sha }}
